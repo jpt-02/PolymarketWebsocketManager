@@ -2,8 +2,6 @@ from websocket import WebSocketApp
 import json
 import time
 import threading
-#from dotenv import load_dotenv, find_dotenv
-#import os
 import time
 import json
 import ntplib
@@ -37,12 +35,13 @@ class WebSocketOrderBook:
     def on_message(self, ws, message):
         local_time = (time.time()*1000) + (self.time_offset*1000)
         
-        data = json.loads(message)
-        server_time = data.get("timestamp") #ms from Polymarket
-        if server_time:
-            one_way_latency = local_time - int(server_time)
+        #data = json.loads(message)
+        #server_time = data.get("timestamp") #ms from Polymarket
+        #if server_time:
+        #    one_way_latency = local_time - int(server_time)
 
-        #print(message)
+        print(message)
+        exit(1)
         pass
 
     def on_error(self, ws, error):
@@ -66,6 +65,7 @@ class WebSocketOrderBook:
             exit(1)
 
         thr = threading.Thread(target=self.ping, args=(ws,))
+        thr.daemon = True # I added this - daemon can be used for threads with data we dont care about saving
         thr.start()
 
 
@@ -110,17 +110,20 @@ class WebSocketOrderBook:
         self.ws.run_forever()
 
 
-# Sample code from polymarket API docs:
+# Sample code from polymarket API docs - used to make sure the above class is working
 if __name__ == "__main__":
     url = "wss://ws-subscriptions-clob.polymarket.com"
-    #Complete these by exporting them from your initialized client. 
-    api_key = ""
-    api_secret = ""
-    api_passphrase = ""
+    
+    #Complete these by exporting them from your initialized client.
+    from dotenv import load_dotenv, find_dotenv
+    import os
+    env_path = find_dotenv()
+    load_dotenv(env_path)
+    api_key = os.getenv('POLY_API_KEY')
+    api_secret = os.getenv('POLY_API_SECRET')
+    api_passphrase = os.getenv('POLY_API_PASSPHRASE')
 
-    asset_ids = [
-        "109681959945973300464568698402968596289258214226684818748321941747028805721376",
-    ]
+    asset_ids = ['21742467318044319401490226317511470430030030588698944583920951666492323201461']
     condition_ids = [] # no really need to filter by this one
 
     auth = {"apiKey": api_key, "secret": api_secret, "passphrase": api_passphrase}
@@ -128,11 +131,11 @@ if __name__ == "__main__":
     market_connection = WebSocketOrderBook(
         MARKET_CHANNEL, url, asset_ids, auth, None, True
     )
-    user_connection = WebSocketOrderBook(
-        USER_CHANNEL, url, condition_ids, auth, None, True
-    )
+    #user_connection = WebSocketOrderBook(
+    #    USER_CHANNEL, url, condition_ids, auth, None, True
+    #)
 
-    market_connection.subscribe_to_tokens_ids(["123"])
+    #market_connection.subscribe_to_tokens_ids(["21742467318044319401490226317511470430030030588698944583920951666492323201461"])
     # market_connection.unsubscribe_to_tokens_ids(["123"])
 
     market_connection.run()
