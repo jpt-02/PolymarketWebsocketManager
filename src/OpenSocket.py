@@ -30,8 +30,6 @@ class WebSocketOrderBook:
         self.time_offset_updated = False
         self.lock = threading.Lock()
 
-        threading.Thread(target=self.update_time_offset, daemon=True).start()
-
     def on_message(self, ws, message):
         local_time = (time.time()*1000) + (self.time_offset*1000)
         
@@ -41,8 +39,6 @@ class WebSocketOrderBook:
         #    one_way_latency = local_time - int(server_time)
 
         print(message)
-        exit(1)
-        pass
 
     def on_error(self, ws, error):
         print("Error: ", error)
@@ -64,10 +60,11 @@ class WebSocketOrderBook:
         else:
             exit(1)
 
-        thr = threading.Thread(target=self.ping, args=(ws,))
-        thr.daemon = True # I added this - daemon can be used for threads with data we dont care about saving
-        thr.start()
+        self.pingthread = threading.Thread(target=self.ping, args=(ws,), daemon=True)
+        self.pingthread.start()
 
+        self.offsetthread = threading.Thread(target=self.update_time_offset, daemon=True)
+        self.offsetthread.start()
 
     def subscribe_to_tokens_ids(self, assets_ids):
         if self.channel_type == MARKET_CHANNEL:
@@ -106,15 +103,30 @@ class WebSocketOrderBook:
 
             time.sleep(300)
 
-    def run(self):
+    def run_blocking(self):
         self.ws.run_forever()
+
+    def run_threaded(self):
+        """Starts the websocket in a background thread."""
+        self.mainthread = threading.Thread(target=self.ws.run_forever, daemon=True)
+        self.mainthread.start()
+        print(f"Connection to {self.channel_type} started in background.")
+
+    def stop(self):
+        """Closes the connection."""
+        self.ws.close()
+        #if self.mainthread:
+        #    self.mainthread.join()
+        #if self.pingthread:
+        #    self.pingthread.join()
+        #if self.offsetthread:
+        #    self.offsetthread.join()
 
 
 # Sample code from polymarket API docs - used to make sure the above class is working
 if __name__ == "__main__":
     url = "wss://ws-subscriptions-clob.polymarket.com"
-    
-    #Complete these by exporting them from your initialized client.
+
     from dotenv import load_dotenv, find_dotenv
     import os
     env_path = find_dotenv()
@@ -123,7 +135,11 @@ if __name__ == "__main__":
     api_secret = os.getenv('POLY_API_SECRET')
     api_passphrase = os.getenv('POLY_API_PASSPHRASE')
 
-    asset_ids = ['21742467318044319401490226317511470430030030588698944583920951666492323201461']
+    slug = "btc-updown-15m-1771519500"
+    from GetIDs import market_from_slug
+    question, conditionID, upID, downID = market_from_slug(slug)
+
+    asset_ids = [upID]
     condition_ids = [] # no really need to filter by this one
 
     auth = {"apiKey": api_key, "secret": api_secret, "passphrase": api_passphrase}
@@ -138,5 +154,13 @@ if __name__ == "__main__":
     #market_connection.subscribe_to_tokens_ids(["21742467318044319401490226317511470430030030588698944583920951666492323201461"])
     # market_connection.unsubscribe_to_tokens_ids(["123"])
 
-    market_connection.run()
+    #market_connection.run()
     # user_connection.run()
+
+    market_connection.run_threaded()
+
+    try:    # necessary for keeping the thread alive if using run_threaded
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        market_connection.stop()
