@@ -25,20 +25,16 @@ class WebSocketOrderBook:
             on_close=self.on_close,
             on_open=self.on_open,
         )
-        self.orderbooks = {}
+        #self.orderbooks = {}
         self.time_offset = 0.0
         self.time_offset_updated = False
         self.lock = threading.Lock()
 
     def on_message(self, ws, message):
-        local_time = (time.time()*1000) + (self.time_offset*1000)
-        
-        #data = json.loads(message)
-        #server_time = data.get("timestamp") #ms from Polymarket
-        #if server_time:
-        #    one_way_latency = local_time - int(server_time)
-
+        localtime = (time.time()*1000) + (self.time_offset*1000)
         print(message)
+        if self.message_callback:
+            self.message_callback(json.loads(message),localtime)
 
     def on_error(self, ws, error):
         print("Error: ", error)
@@ -73,7 +69,6 @@ class WebSocketOrderBook:
     def unsubscribe_to_tokens_ids(self, assets_ids):
         if self.channel_type == MARKET_CHANNEL:
             self.ws.send(json.dumps({"assets_ids": assets_ids, "operation": "unsubscribe"}))
-
 
     def ping(self, ws):
         while True:
@@ -115,12 +110,6 @@ class WebSocketOrderBook:
     def stop(self):
         """Closes the connection."""
         self.ws.close()
-        #if self.mainthread:
-        #    self.mainthread.join()
-        #if self.pingthread:
-        #    self.pingthread.join()
-        #if self.offsetthread:
-        #    self.offsetthread.join()
 
 
 # Sample code from polymarket API docs - used to make sure the above class is working
@@ -135,7 +124,7 @@ if __name__ == "__main__":
     api_secret = os.getenv('POLY_API_SECRET')
     api_passphrase = os.getenv('POLY_API_PASSPHRASE')
 
-    slug = "btc-updown-15m-1771519500"
+    slug = "btc-updown-15m-1771790400"
     from GetIDs import market_from_slug
     question, conditionID, upID, downID = market_from_slug(slug)
 
@@ -147,20 +136,12 @@ if __name__ == "__main__":
     market_connection = WebSocketOrderBook(
         MARKET_CHANNEL, url, asset_ids, auth, None, True
     )
-    #user_connection = WebSocketOrderBook(
-    #    USER_CHANNEL, url, condition_ids, auth, None, True
-    #)
-
-    #market_connection.subscribe_to_tokens_ids(["21742467318044319401490226317511470430030030588698944583920951666492323201461"])
-    # market_connection.unsubscribe_to_tokens_ids(["123"])
-
-    #market_connection.run()
-    # user_connection.run()
 
     market_connection.run_threaded()
 
     try:    # necessary for keeping the thread alive if using run_threaded
         while True:
             time.sleep(1)
+            market_connection.stop()
     except KeyboardInterrupt:
         market_connection.stop()
