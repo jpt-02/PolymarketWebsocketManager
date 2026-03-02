@@ -3,7 +3,6 @@ import json
 import time
 import threading
 import time
-import json
 import ntplib
 
 MARKET_CHANNEL = "market"
@@ -33,8 +32,7 @@ class WebSocketOrderBook:
     def on_message(self, ws, message):
         localtime = (time.time()*1000) + (self.time_offset*1000)
         print(message)
-        if self.message_callback:
-            self.message_callback(json.loads(message),localtime)
+        self.message_callback(message,localtime)
 
     def on_error(self, ws, error):
         print("Error: ", error)
