@@ -28,13 +28,12 @@ class OrderBook:
         for ask in message['asks']:
             self.asks = {ask['price']: float(ask['size'])}
 
-    def update_asset(self,price_changes):
-        for change in price_changes:
-            target = self.bids if change['side'] == 'BUY' else self.asks
-            price = price_changes['price']
-            size = float(price_changes['size'])
+    def update_asset(self,change):
+        target = self.bids if change['side'] == 'BUY' else self.asks
+        price = change['price']
+        size = float(change['size'])
 
-            if size == 0:
-                target.pop(price, None)
-            else:
-                target[price] = size
+        if size == 0:
+            target.pop(price, None)
+        else:
+            target[price] = size

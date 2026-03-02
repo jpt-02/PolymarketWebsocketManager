@@ -2,6 +2,7 @@ from OpenSocket import WebSocketOrderBook
 from dotenv import load_dotenv, find_dotenv
 import os
 from bookslots import OrderBook
+import json
 
 
 class Bookmaker:
@@ -25,11 +26,11 @@ class MarketBookmaker(Bookmaker):
     # TO DO:
     #   -make it so bookdict gets rid of books once a market expires
     def __init__(self):
-        super().__init__(self)
+        super().__init__()
         self.bookdict = {} # assetID : OrderBook object from bookslots.py
 
     def message_input(self,message,localtime):
-        # message is already json.loads in the websocket on_message function
+        message = json.loads(message) # message originally comes in as a string
         if isinstance(message,list):
             for item in message: self.message_input(item,localtime)
         elif isinstance(message,dict):
@@ -49,15 +50,14 @@ class MarketBookmaker(Bookmaker):
 
 class UserBookmaker(Bookmaker):
     def __init__(self):
-        super().__init__(self)
+        super().__init__()
 
 class RTDSBookmaker(Bookmaker):
     def __init__(self):
-        super().__init__(self)
+        super().__init__()
 
 
 
-import json
 
 tstring = '[{"name": "John", "age": 30, "city": "New York"}]'
 for key in json.loads(tstring):
