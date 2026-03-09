@@ -32,7 +32,7 @@ class WebSocketOrderBook:
     def on_message(self, ws, message):
         localtime = (time.time()*1000) + (self.time_offset*1000)
         print(message)
-        self.message_callback(message,localtime)
+        self.message_callback(message)
 
     def on_error(self, ws, error):
         print("Error: ", error)

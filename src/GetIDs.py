@@ -1,5 +1,7 @@
 import requests
 import ast
+import asyncio
+import time
 
 def market_from_slug(slug):
     # Gamma API endpoint for fetching market by its URL slug
@@ -24,3 +26,12 @@ def market_from_slug(slug):
 if __name__ == "__main__":
     slug = "btc-updown-15m-1771519500"
     print(market_from_slug(slug))
+
+
+class MarketManager:
+    def __init__(self,websocket):
+        self.websocket = websocket
+        self.current_assets = []
+        self.queued_assets = []
+
+    
