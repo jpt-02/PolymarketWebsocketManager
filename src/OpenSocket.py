@@ -2,7 +2,6 @@ from websocket import WebSocketApp
 import json
 import time
 import threading
-import time
 import ntplib
 
 MARKET_CHANNEL = "market"

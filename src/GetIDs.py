@@ -27,60 +27,54 @@ if __name__ == "__main__":
     slug = "btc-updown-15m-1771519500"
     print(market_from_slug(slug))
 
-class ValidCoin:
-    def __init__(self,coin,valid_durations):
-        known_coins = ['btc','eth','xrp','sol','hype','bnb']
-        known_durations = ['5min','15min','1hour','4hour']
-        
-        for duration in valid_durations:
-            assert (duration in known_durations), f'Duration {duration} Not Recognized'
-        assert (coin in known_coins), f'Coin name {coin} Not Recognized'
 
-        self.coinname = coin
-        self.valid_durations = valid_durations
+KNOWN_COIN_MARKETS = {
+    'btc':['5min','15min','1hour','4hour'],
+    'eth':['5min','15min','1hour','4hour'],
+    'xrp':['5min','15min','1hour','4hour'],
+    'sol':['5min','15min','1hour','4hour']
+}
+
+
 
 class MarketIdentifier:
     def __init__(self,coin,duration,time):
+        assert (coin in KNOWN_COIN_MARKETS), f'Coin name {coin} not recognized'
+        assert (duration in KNOWN_COIN_MARKETS[coin]), f'Duration {duration} not recognized for coin {coin}'
+
         self.coin = coin
         self.duration = duration
         #self.time = 
 
-        self.valid_coins = [
-            ValidCoin('btc')
-
-        ]
-
     def _duration_slug_part(self,duration):
-        assert (duration in ['5min','15min','1hour','4hour']), f'Duration {duration} Not Recognized'
-
-        if duration == '5min'
+        duration_slug_dict = {
+            '5min':'5m',
+            '15min':'15m',
+            '1hour':'',
+            '4hour':'4h'
+        }
+        return duration_slug_dict[duration]
 
     def _crypto_slug_part(self,coin,duration):
-        assert (coin in ['btc','eth','xrp','sol']), f'Coin name {coin} Not Recognized'
-        assert (duration in ['5min','15min','1hour','4hour']), f'Duration {duration} Not Recognized'
-        
         if duration == '1hour':
-            if coin == 'btc':
-                return 'bitcoin-up-or-down-'
-            elif coin == 'eth':
-                return ''
-            elif coin == 'xrp':
-                return ''
-            elif coin == 'sol':
-                return ''
-
+            crypto_slug_dict = {
+                'btc':'bitcoin-up-or-down-',
+                'eth':'ethereum-up-or-down-',
+                'xrp':'xrp-up-or-down-',
+                'sol':'solana-up-or-down-'
+            }
+            return crypto_slug_dict[coin]
         else:
-            if coin == 'btc':
-                return 'btc-updown-'
-            elif coin == 'eth':
-                return 'eth-updown-'
-            elif coin == 'xrp':
-                return 'xrp-updown-'
-            elif coin == 'sol':
-                return 'sol-updown-'
+            crypto_slug_dict = {
+                'btc':'btc-updown-',
+                'eth':'eth-updown-',
+                'xrp':'xrp-updown-',
+                'sol':'sol-updown-'
+            }
+            return crypto_slug_dict[coin]
 
 
-    def _timestamp_slug_part(self,time):
+    def _timestamp_slug_part(self,time,duration):
         pass
 
     def make_slug(self,coin,duration,time):
