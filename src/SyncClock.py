@@ -4,7 +4,7 @@ from socket import gaierror, timeout
 import threading
 
 class SyncClock:
-    def __init__(self,interval):
+    def __init__(self,interval=300):
         self.interval = interval
         self.offset = 0.0
         self.skew = 0.0
