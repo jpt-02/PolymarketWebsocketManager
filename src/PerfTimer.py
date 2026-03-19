@@ -3,7 +3,7 @@ import ntplib
 from socket import gaierror, timeout
 import threading
 
-class Timer:
+class SyncClock:
     def __init__(self,interval):
         self.interval = interval
         self.offset = 0.0
@@ -105,7 +105,6 @@ class Timer:
     def _print_error(self):
         errorval = self.now() - self.now_no_skew()
         print(f'Error of {errorval}')
-
     
     def now_no_skew(self):
         elapsed = time.perf_counter() - self.perf_reference
@@ -117,7 +116,7 @@ class Timer:
 
     
 if __name__ == '__main__':
-    timer = Timer(10)
+    timer = SyncClock(10)
     while True:
         time.sleep(1)
         timer._print_error()

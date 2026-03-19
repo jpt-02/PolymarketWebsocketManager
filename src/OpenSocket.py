@@ -2,7 +2,6 @@ from websocket import WebSocketApp
 import json
 import time
 import threading
-import ntplib
 
 MARKET_CHANNEL = "market"
 USER_CHANNEL = "user"
@@ -24,12 +23,8 @@ class WebSocketOrderBook:
             on_open=self.on_open,
         )
         #self.orderbooks = {}
-        self.time_offset = 0.0
-        self.time_offset_updated = False
-        self.lock = threading.Lock()
 
     def on_message(self, ws, message):
-        localtime = (time.time()*1000) + (self.time_offset*1000)
         print(message)
         self.message_callback(message)
 
@@ -56,8 +51,6 @@ class WebSocketOrderBook:
         self.pingthread = threading.Thread(target=self.ping, args=(ws,), daemon=True)
         self.pingthread.start()
 
-        self.offsetthread = threading.Thread(target=self.update_time_offset, daemon=True)
-        self.offsetthread.start()
 
     def subscribe_to_tokens_ids(self, assets_ids):
         if self.channel_type == MARKET_CHANNEL:
@@ -71,29 +64,6 @@ class WebSocketOrderBook:
         while True:
             ws.send("PING")
             time.sleep(10)
-
-    def get_time_offset(self):
-        client = ntplib.NTPClient()
-        try:
-            response = client.request('pool.ntp.org', version=3)
-            return (response.offset, True)
-        except Exception as e:
-            if self.verbose:
-                print(f"NTP Sync failed: {e}")
-            return (self.time_offset, False)
-        
-    def update_time_offset(self):
-        while True:
-            time_offset, time_offset_updated = self.get_time_offset()
-
-            with self.lock:
-                self.time_offset = time_offset
-                self.time_offset_updated = time_offset_updated
-                
-            if self.verbose:
-                print(f"Offset synced: {self.time_offset*1000:.2f}ms")
-
-            time.sleep(300)
 
     def run_blocking(self):
         self.ws.run_forever()
