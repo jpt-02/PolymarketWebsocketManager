@@ -8,11 +8,13 @@ class Timer:
         self.interval = interval
         self.offset = 0.0
         self.skew = 0.0
+        self.skewrate = 0.0
         self.system_time_reference = time.time_ns()/(10**9)
         self.perf_reference = time.perf_counter() # perf counter starting point
 
         self._lock = threading.Lock()
         self.thread = threading.Thread(target=self._worker, daemon=True)
+        self.startup = True
         self.thread.start()
     
     def get_best_offset(self):
@@ -67,35 +69,56 @@ class Timer:
                 new_now = new_system_time_reference + new_offset
 
                 self.skew = new_now - old_now # Difference between pre and post NTP sync times
-                skewrate = self.skew/self.interval # Seconds to change per second
+                self.skewrate = self.skew/self.interval # Seconds to change per second
+
+                if self.startup:
+                    self.skew = 0
+                    self.skewrate = 0
+                    self.startup = False
 
                 # Update Old Variables
                 self.offset = new_offset
                 self.system_time_reference = new_system_time_reference
                 self.perf_reference = time.perf_counter()
 
-                print(self.offset*1000)
+                print(f'Offset is {self.offset*1000}ms')
+
+                # for testing
+                #self.newtarget = new_now + self.interval
 
     def _worker(self):
         self.update_time_reference() # initial on startup
 
         while True:
             try:
-                time.sleep(300)
+                time.sleep(self.interval)
+
+                # for testing
+                #errorval = self.now() - self.newtarget
+                #print(f'Error of {errorval} at end of Sync interval')
+
                 self.update_time_reference()
             except Exception as e:
                 print(f"Critical error in Timer Thread: {e}")
                 time.sleep(10) # wait before retrying
+    
+    def _print_error(self):
+        errorval = self.now() - self.now_no_skew()
+        print(f'Error of {errorval}')
 
+    
+    def now_no_skew(self):
+        elapsed = time.perf_counter() - self.perf_reference
+        return self.system_time_reference + self.offset + elapsed
         
     def now(self):
         elapsed = time.perf_counter() - self.perf_reference
-        return self.system_time_reference + self.offset + elapsed - self.skew
+        return self.system_time_reference + self.offset + elapsed - self.skew + (elapsed*self.skewrate)
 
     
 if __name__ == '__main__':
-    timer = Timer(30)
+    timer = Timer(10)
     while True:
-        time.sleep(5)
-        print(timer.now())
+        time.sleep(1)
+        timer._print_error()
     
