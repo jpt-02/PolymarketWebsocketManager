@@ -3,6 +3,8 @@ import ast
 import time
 from datetime import datetime
 import pytz
+import threading
+import math
 
 def market_from_slug(slug):
     # Gamma API endpoint for fetching market by its URL slug
@@ -45,6 +47,29 @@ class MarketIdentifier:
         self.timeframe = timeframe
 
         self.slug = self._make_slug()
+
+        self.durationtime = self._duration_in_seconds()
+        self.starttime = int(self._interval_timestamp())
+        self.stoptime = self.starttime + self.durationtime
+
+        self.question, self.conditionID, self.upID, self.downID = self.market_from_slug(self.slug)
+
+    def market_from_slug(self,slug):
+        # Gamma API endpoint for fetching market by its URL slug
+        url = f"https://gamma-api.polymarket.com/markets/slug/{slug}"
+        
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            
+            #ast.literal_eval is necessary because otherwise its a string of IDs, not a list of strings
+            upID, downID = ast.literal_eval(data['clobTokenIds'])
+            conditionID = data['conditionId']
+            question = data['question']
+            
+            return question, conditionID, upID, downID
+        else:
+            raise Exception(f"Error fetching market data for slug {slug}")
 
     def _duration_slug_part(self):
         duration = self.duration
@@ -116,27 +141,156 @@ class MarketIdentifier:
         timepart = self._timestamp_slug_part()
         return coinpart+durationpart+timepart
 
-if __name__ == "__main__":
-    slug = "btc-updown-15m-1771519500"
-    #print(market_from_slug(slug))
-    TestIdentifier1 = MarketIdentifier('btc','15min','now')
-    #print(TestIdentifier1._crypto_slug_part())
-    #print(TestIdentifier1._duration_slug_part())
-    #print(TestIdentifier1._timestamp_slug_part())
-    print(TestIdentifier1.slug)
-    TestIdentifier2 = MarketIdentifier('btc','1hour','now')
-    #print(TestIdentifier2._crypto_slug_part())
-    #print(TestIdentifier2._duration_slug_part())
-    #print(TestIdentifier2._timestamp_slug_part())
-    print(TestIdentifier2.slug)
+# if __name__ == "__main__":
+#     slug = "btc-updown-15m-1771519500"
+#     #print(market_from_slug(slug))
+#     TestIdentifier1 = MarketIdentifier('btc','15min','now')
+#     #print(TestIdentifier1._crypto_slug_part())
+#     #print(TestIdentifier1._duration_slug_part())
+#     #print(TestIdentifier1._timestamp_slug_part())
+#     print(TestIdentifier1.slug)
+#     TestIdentifier2 = MarketIdentifier('btc','1hour','now')
+#     #print(TestIdentifier2._crypto_slug_part())
+#     #print(TestIdentifier2._duration_slug_part())
+#     #print(TestIdentifier2._timestamp_slug_part())
+#     print(TestIdentifier2.slug)
 
 
 
 class IDManager:
     def __init__(self,websocket):
         self.websocket = websocket
+        self.focusdict = {} # duration: {coins:list, worker:thread}
+        self.threads = {}
         self.current_assets = []
         self.queued_assets = []
 
 
+    def add_focus(self,coin,duration):
+        # tells manager which assets to focus on
+        assert (coin in KNOWN_COIN_MARKETS), f'Coin name {coin} not recognized'
+        assert (duration in KNOWN_COIN_MARKETS[coin]), f'Duration {duration} not recognized for coin {coin}'
 
+        if duration not in self.focusdict:
+            self.focusdict[duration] = {'coins':[coin]}
+            # modify to add thread
+            #dummy_market = MarketIdentifier(coin,duration) # dummy market for the thread to get starting info
+            new_thread = threading.Thread(target=self._worker, args=[duration], daemon=True)
+            new_thread.start()
+            self.focusdict[duration]['worker'] = new_thread
+
+        elif coin not in self.focusdict[duration]['coins']:
+            self.focusdict[duration]['coins'].append(coin)
+
+        else:
+            return
+
+
+    def remove_focus(self,coin,duration):
+        # tells manager to stop focusing on an asset
+        if (coin,duration) not in self.focuslist:
+            self.focuslist.remove((coin,duration))
+
+
+    def _add_asset(self,coin,duration):
+        # create a market identifier object with 'next' timeframe
+        new_asset = MarketIdentifier(coin,duration,'next')
+        # use the market identifier to pull the start time and duration
+
+        # store times in some kind of dictionary with a worker that reads it
+        pass
+
+    def _worker(self,duration):
+        # check the list of coins for each interval
+        # subscribe and unsibscribe for each
+
+        startup = True
+
+        start_anchor = dummy_market.starttime # going to be beginning of some interval
+        duration = dummy_market.durationtime # add to start_anchor to get next interval start
+        end_anchor = dummy_market.stoptime
+        now = time.time()
+        
+        next_subscribe_time = end_anchor - 60
+        if now > next_subscribe_time:
+            next_subscribe_time = now
+
+        print(f'sleeping for {next_subscribe_time-now} s')
+        time.sleep(next_subscribe_time-now)
+
+        while True:
+            # subscribe to next market                     -1:00
+            # wait until 60s after market open/close        1:00
+            # unsubscribe from previous market              1:00
+            # wait duration-120s                            4:00
+            # loop
+            return
+
+    def _worker2(self,duration):
+        while True:
+            skipfirst = False
+            # gather all coin IDs for duration
+            current_ids = []
+            next_ids = []
+            for coin in self.focusdict[duration]['coins']:
+                current_ids.append(MarketIdentifier(coin,duration,'now'))
+                next_ids.append(MarketIdentifier(coin,duration,'next'))
+
+            # work out timing
+            if len(current_ids) > 0:
+                market_start = current_ids[0].starttime
+                market_end = current_ids[0].stoptime
+                duration_s = current_ids[0].durationtime
+                halfway_target = market_start + duration_s/2
+                now = time.time()
+            else:
+                return # find some non-retarded way to break the loop
+
+
+            # # right now ideally is 1:00
+            # if now < halfway_target:
+            #     # if not past halfway, wait until halfway
+            #     time.sleep(halfway_target-now) # time is now 2:30
+            # elif now < market_end-60:
+            #     # if past halfway but not before next market sub time, raie flag to skip
+            #     # first sleep outside of if cascade
+            #     time.sleep(market_end-60-now) # wait until time is 4:00 or -1:00
+            #     skipfirst = True
+            # else:
+            #     # if past halfway and subtime, wait until next loop and retry
+            #     time.sleep(duration_s/2)
+            #     continue
+
+            if now < market_end-60:
+                # if not before next market sub time
+                time.sleep(market_end-60-now) # wait until time is 4:00 or -1:00
+            else:
+                # if past halfway and subtime, wait until next loop and retry
+                time.sleep(duration_s/2)
+                continue
+
+
+            # if not skipfirst:
+            #     time.sleep((duration_s/2)-60) # wait for 1:30 until time is 4:00 or -1:00
+            # skipfirst = False
+
+            # sub to 'next' markets     -1:00
+            time.sleep(60)
+            # markets officially start/end - do nothing       0:00
+            time.sleep(60)
+            # unsub from 'now' markets if not startup         1:00 
+            # loop ends at around 1:00
+
+
+            
+
+
+        
+
+
+testmanager = IDManager('test')
+testmanager.add_focus('btc','15min')
+testmanager.add_focus('btc','15min')
+testmanager.add_focus('btc','5min')
+testmanager.add_focus('eth','5min')
+print(testmanager.focusdict)
