@@ -200,33 +200,8 @@ class IDManager:
         # store times in some kind of dictionary with a worker that reads it
         pass
 
+
     def _worker(self,duration):
-        # check the list of coins for each interval
-        # subscribe and unsibscribe for each
-
-        startup = True
-
-        start_anchor = dummy_market.starttime # going to be beginning of some interval
-        duration = dummy_market.durationtime # add to start_anchor to get next interval start
-        end_anchor = dummy_market.stoptime
-        now = time.time()
-        
-        next_subscribe_time = end_anchor - 60
-        if now > next_subscribe_time:
-            next_subscribe_time = now
-
-        print(f'sleeping for {next_subscribe_time-now} s')
-        time.sleep(next_subscribe_time-now)
-
-        while True:
-            # subscribe to next market                     -1:00
-            # wait until 60s after market open/close        1:00
-            # unsubscribe from previous market              1:00
-            # wait duration-120s                            4:00
-            # loop
-            return
-
-    def _worker2(self,duration):
         while True:
             skipfirst = False
             # gather all coin IDs for duration
@@ -246,39 +221,23 @@ class IDManager:
             else:
                 return # find some non-retarded way to break the loop
 
-
-            # # right now ideally is 1:00
-            # if now < halfway_target:
-            #     # if not past halfway, wait until halfway
-            #     time.sleep(halfway_target-now) # time is now 2:30
-            # elif now < market_end-60:
-            #     # if past halfway but not before next market sub time, raie flag to skip
-            #     # first sleep outside of if cascade
-            #     time.sleep(market_end-60-now) # wait until time is 4:00 or -1:00
-            #     skipfirst = True
-            # else:
-            #     # if past halfway and subtime, wait until next loop and retry
-            #     time.sleep(duration_s/2)
-            #     continue
-
             if now < market_end-60:
                 # if not before next market sub time
+                print(f'{duration} Thread: waiting until {time.ctime(time.time()+(market_end-60-now))}')
                 time.sleep(market_end-60-now) # wait until time is 4:00 or -1:00
             else:
                 # if past halfway and subtime, wait until next loop and retry
+                print(f'{duration} Thread: Waiting until next loop')
                 time.sleep(duration_s/2)
                 continue
 
-
-            # if not skipfirst:
-            #     time.sleep((duration_s/2)-60) # wait for 1:30 until time is 4:00 or -1:00
-            # skipfirst = False
-
             # sub to 'next' markets     -1:00
+            print(f'{duration} Thread: subscribing to market start at {time.ctime(next_ids[0].starttime)} at {time.ctime()}')
             time.sleep(60)
             # markets officially start/end - do nothing       0:00
             time.sleep(60)
-            # unsub from 'now' markets if not startup         1:00 
+            # unsub from 'now' markets if not startup         1:00
+            print(f'{duration} Thread: unsubscribing to market stop at {time.ctime(current_ids[0].stoptime)} at {time.ctime()}')
             # loop ends at around 1:00
 
 
@@ -289,8 +248,16 @@ class IDManager:
 
 
 testmanager = IDManager('test')
-testmanager.add_focus('btc','15min')
-testmanager.add_focus('btc','15min')
-testmanager.add_focus('btc','5min')
-testmanager.add_focus('eth','5min')
+# testmanager.add_focus('btc','15min')
+# testmanager.add_focus('btc','15min')
+# testmanager.add_focus('btc','5min')
+# testmanager.add_focus('eth','5min')
+testmanager.add_focus('sol','1hour')
+testmanager.add_focus('xrp','4hour')
 print(testmanager.focusdict)
+
+try:
+    while True:
+        time.sleep(10)
+except KeyboardInterrupt:
+    pass
