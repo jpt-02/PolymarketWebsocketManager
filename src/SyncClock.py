@@ -2,6 +2,9 @@ import time
 import ntplib
 from socket import gaierror, timeout
 import threading
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SyncClock:
     def __init__(self,interval=300):
