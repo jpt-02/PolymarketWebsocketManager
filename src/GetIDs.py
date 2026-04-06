@@ -6,6 +6,12 @@ import pytz
 import threading
 import math
 
+import logging
+from logsconfig import console_logger
+logger = logging.getLogger(__name__)
+
+
+
 def market_from_slug(slug):
     # Gamma API endpoint for fetching market by its URL slug
     url = f"https://gamma-api.polymarket.com/markets/slug/{slug}"
@@ -156,7 +162,6 @@ class MarketIdentifier:
 #     print(TestIdentifier2.slug)
 
 
-
 class IDManager:
     def __init__(self,websocket):
         self.websocket = websocket
@@ -173,8 +178,6 @@ class IDManager:
 
         if duration not in self.focusdict:
             self.focusdict[duration] = {'coins':[coin]}
-            # modify to add thread
-            #dummy_market = MarketIdentifier(coin,duration) # dummy market for the thread to get starting info
             new_thread = threading.Thread(target=self._worker, args=[duration], daemon=True)
             new_thread.start()
             self.focusdict[duration]['worker'] = new_thread
@@ -188,17 +191,9 @@ class IDManager:
 
     def remove_focus(self,coin,duration):
         # tells manager to stop focusing on an asset
+        # needs to be updated
         if (coin,duration) not in self.focuslist:
             self.focuslist.remove((coin,duration))
-
-
-    def _add_asset(self,coin,duration):
-        # create a market identifier object with 'next' timeframe
-        new_asset = MarketIdentifier(coin,duration,'next')
-        # use the market identifier to pull the start time and duration
-
-        # store times in some kind of dictionary with a worker that reads it
-        pass
 
 
     def _worker(self,duration):
@@ -241,23 +236,25 @@ class IDManager:
             # loop ends at around 1:00
 
 
-            
+               
 
+if __name__ == '__main__':
 
-        
+    listener = console_logger()
 
+    logger.info('Logging started locally')
 
-testmanager = IDManager('test')
-# testmanager.add_focus('btc','15min')
-# testmanager.add_focus('btc','15min')
-# testmanager.add_focus('btc','5min')
-# testmanager.add_focus('eth','5min')
-testmanager.add_focus('sol','1hour')
-testmanager.add_focus('xrp','4hour')
-print(testmanager.focusdict)
+    testmanager = IDManager('test')
+    # testmanager.add_focus('btc','15min')
+    # testmanager.add_focus('btc','15min')
+    # testmanager.add_focus('btc','5min')
+    # testmanager.add_focus('eth','5min')
+    testmanager.add_focus('sol','1hour')
+    testmanager.add_focus('xrp','4hour')
+    print(testmanager.focusdict)
 
-try:
-    while True:
-        time.sleep(10)
-except KeyboardInterrupt:
-    pass
+    try:
+        while True:
+            time.sleep(10)
+    except KeyboardInterrupt:
+        pass
