@@ -10,7 +10,7 @@ def console_logger():
 
     # Format and destination setup
     console_handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s | %(name)s | %(levelname)s | %(message)s')
     console_handler.setFormatter(formatter)
 
     # listener runs in background thread

@@ -173,8 +173,13 @@ class IDManager:
 
     def add_focus(self,coin,duration):
         # tells manager which assets to focus on
-        assert (coin in KNOWN_COIN_MARKETS), f'Coin name {coin} not recognized'
-        assert (duration in KNOWN_COIN_MARKETS[coin]), f'Duration {duration} not recognized for coin {coin}'
+        if coin not in KNOWN_COIN_MARKETS:
+            logger.warning(f'Coin name {coin} not recognized')
+            return
+
+        if duration not in KNOWN_COIN_MARKETS[coin]:
+            logger.warning(f'Duration {duration} not recognized for coin {coin}')
+            return
 
         if duration not in self.focusdict:
             self.focusdict[duration] = {'coins':[coin]}
@@ -185,8 +190,6 @@ class IDManager:
         elif coin not in self.focusdict[duration]['coins']:
             self.focusdict[duration]['coins'].append(coin)
 
-        else:
-            return
 
 
     def remove_focus(self,coin,duration):
@@ -251,7 +254,9 @@ if __name__ == '__main__':
     # testmanager.add_focus('eth','5min')
     testmanager.add_focus('sol','1hour')
     testmanager.add_focus('xrp','4hour')
-    print(testmanager.focusdict)
+    testmanager.add_focus('idk','idk')
+    testmanager.add_focus('btc','idk')
+    #print(testmanager.focusdict)
 
     try:
         while True:
