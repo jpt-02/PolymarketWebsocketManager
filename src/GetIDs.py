@@ -174,21 +174,30 @@ class IDManager:
     def add_focus(self,coin,duration):
         # tells manager which assets to focus on
         if coin not in KNOWN_COIN_MARKETS:
-            logger.warning(f'Coin name {coin} not recognized')
+            logger.warning(f"Coin name '{coin}' not recognized")
             return
 
         if duration not in KNOWN_COIN_MARKETS[coin]:
-            logger.warning(f'Duration {duration} not recognized for coin {coin}')
+            logger.warning(f"Duration '{duration}' not recognized for coin '{coin}'")
             return
 
         if duration not in self.focusdict:
+            # There is not currently a thread timing the requested duration
             self.focusdict[duration] = {'coins':[coin]}
             new_thread = threading.Thread(target=self._worker, args=[duration], daemon=True)
             new_thread.start()
             self.focusdict[duration]['worker'] = new_thread
+            logger.info(f"Created new thread for duration '{duration}'")
+            logger.info(f"Added coin '{coin}' to thread with duration '{duration}'")
 
         elif coin not in self.focusdict[duration]['coins']:
+            # There is a thread timing the requested duration, but it does not have the requested coin
             self.focusdict[duration]['coins'].append(coin)
+            logger.info(f"Added coin '{coin}' to thread with duration '{duration}'")
+
+        else:
+            # The duration+coin combination is already accounted for
+            logger.warning(f"Coin '{coin}' already in thread with duration '{duration}'")
 
 
 
