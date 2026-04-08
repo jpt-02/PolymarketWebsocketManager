@@ -166,19 +166,19 @@ class IDManager:
     def __init__(self,websocket):
         self.websocket = websocket
         self.focusdict = {} # duration: {coins:list, worker:thread}
-        self.threads = {}
-        self.current_assets = []
-        self.queued_assets = []
+        #self.threads = {}
+        #self.current_assets = []
+        #self.queued_assets = []
 
 
     def add_focus(self,coin,duration):
         # tells manager which assets to focus on
         if coin not in KNOWN_COIN_MARKETS:
-            logger.warning(f"Coin name '{coin}' not recognized")
+            logger.warning(f"Coin name '{coin}' not recognized and could not be added")
             return
 
         if duration not in KNOWN_COIN_MARKETS[coin]:
-            logger.warning(f"Duration '{duration}' not recognized for coin '{coin}'")
+            logger.warning(f"Duration '{duration}' not recognized for coin '{coin}' and could not be added")
             return
 
         if duration not in self.focusdict:
@@ -203,49 +203,81 @@ class IDManager:
 
     def remove_focus(self,coin,duration):
         # tells manager to stop focusing on an asset
-        # needs to be updated
-        if (coin,duration) not in self.focuslist:
-            self.focuslist.remove((coin,duration))
+        if coin not in KNOWN_COIN_MARKETS:
+            logger.warning(f"Coin name '{coin}' not recognized and could not be removed")
+            return
+
+        if duration not in KNOWN_COIN_MARKETS[coin]:
+            logger.warning(f"Duration '{duration}' not recognized for coin '{coin}' and could not be removed")
+            return
+
+        if duration not in self.focusdict:
+            logger.info(f"Coin '{coin}' not in thread with duration '{duration}' and could not be removed")
+            return
+        
+        elif coin not in self.focusdict[duration]['coins']:
+            logger.info(f"Coin '{coin}' not in thread with duration '{duration}' and could not be removed")
+            return 
+        
+        else:
+            # remove coin from coins list
+            self.focusdict[duration]['coins'].remove(coin)
+
+        # remove empty threads
+        #if len(self.focusdict[duration]['coins']) == 0:
+            #self.focusdict[duration]['stop_event'].set()
+            #del self.focusdict[duration]    # let the end of the worker handle this so 2 arent active at once
+
 
 
     def _worker(self,duration):
+        startup = True
+        shutdown = False
         while True:
-            skipfirst = False
+             # alter to ensure atomicity upon adding/removing focuses
+
+            # copy focusdict and anything else needed to access from class
+            coinlist = self.focusdict[duration]['coins'][:]
+            # terminate loop if coin list is empty
+            if len(coinlist) == 0:
+                del self.focusdict[duration]
+                shutdown = True
+
             # gather all coin IDs for duration
             current_ids = []
             next_ids = []
-            for coin in self.focusdict[duration]['coins']:
+            for coin in coinlist:
                 current_ids.append(MarketIdentifier(coin,duration,'now'))
                 next_ids.append(MarketIdentifier(coin,duration,'next'))
 
             # work out timing
-            if len(current_ids) > 0:
-                market_start = current_ids[0].starttime
-                market_end = current_ids[0].stoptime
-                duration_s = current_ids[0].durationtime
-                halfway_target = market_start + duration_s/2
-                now = time.time()
-            else:
-                return # find some non-retarded way to break the loop
+            market_end = current_ids[0].stoptime
+            duration_s = current_ids[0].durationtime
+            now = time.time()
 
             if now < market_end-60:
                 # if not before next market sub time
-                print(f'{duration} Thread: waiting until {time.ctime(time.time()+(market_end-60-now))}')
+                logger.info(f'{duration} Thread: waiting until {time.ctime(time.time()+(market_end-60-now))}')
                 time.sleep(market_end-60-now) # wait until time is 4:00 or -1:00
             else:
                 # if past halfway and subtime, wait until next loop and retry
-                print(f'{duration} Thread: Waiting until next loop')
+                logger.info(f'{duration} Thread: Waiting until next loop')
                 time.sleep(duration_s/2)
                 continue
 
             # sub to 'next' markets     -1:00
-            print(f'{duration} Thread: subscribing to market start at {time.ctime(next_ids[0].starttime)} at {time.ctime()}')
+            if not shutdown: # change to condition to accomodate end of thread
+                logger.info(f'{duration} Thread: subscribing to market start at {time.ctime(next_ids[0].starttime)} at {time.ctime()}')
             time.sleep(60)
             # markets officially start/end - do nothing       0:00
             time.sleep(60)
             # unsub from 'now' markets if not startup         1:00
-            print(f'{duration} Thread: unsubscribing to market stop at {time.ctime(current_ids[0].stoptime)} at {time.ctime()}')
+            if not startup:
+                logger.info(f'{duration} Thread: unsubscribing to market stop at {time.ctime(current_ids[0].stoptime)} at {time.ctime()}')
+                startup = False
             # loop ends at around 1:00
+            if shutdown:
+                return
 
 
                
