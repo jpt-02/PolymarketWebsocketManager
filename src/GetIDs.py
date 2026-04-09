@@ -166,10 +166,6 @@ class IDManager:
     def __init__(self,websocket):
         self.websocket = websocket
         self.focusdict = {} # duration: {coins:list, worker:thread}
-        #self.threads = {}
-        #self.current_assets = []
-        #self.queued_assets = []
-
 
     def add_focus(self,coin,duration):
         # tells manager which assets to focus on
@@ -181,23 +177,24 @@ class IDManager:
             logger.warning(f"Duration '{duration}' not recognized for coin '{coin}' and could not be added")
             return
 
-        if duration not in self.focusdict:
-            # There is not currently a thread timing the requested duration
-            self.focusdict[duration] = {'coins':[coin]}
-            new_thread = threading.Thread(target=self._worker, args=[duration], daemon=True)
-            new_thread.start()
-            self.focusdict[duration]['worker'] = new_thread
-            logger.info(f"Created new thread for duration '{duration}'")
-            logger.info(f"Added coin '{coin}' to thread with duration '{duration}'")
+        with threading.Lock():
+            if duration not in self.focusdict:
+                # There is not currently a thread timing the requested duration
+                self.focusdict[duration] = {'coins':[coin]}
+                new_thread = threading.Thread(target=self._worker, args=[duration], daemon=True)
+                new_thread.start()
+                self.focusdict[duration]['worker'] = new_thread
+                logger.info(f"Created new thread for duration '{duration}'")
+                logger.info(f"Added coin '{coin}' to thread with duration '{duration}'")
 
-        elif coin not in self.focusdict[duration]['coins']:
-            # There is a thread timing the requested duration, but it does not have the requested coin
-            self.focusdict[duration]['coins'].append(coin)
-            logger.info(f"Added coin '{coin}' to thread with duration '{duration}'")
+            elif coin not in self.focusdict[duration]['coins']:
+                # There is a thread timing the requested duration, but it does not have the requested coin
+                self.focusdict[duration]['coins'].append(coin)
+                logger.info(f"Added coin '{coin}' to thread with duration '{duration}'")
 
-        else:
-            # The duration+coin combination is already accounted for
-            logger.warning(f"Coin '{coin}' already in thread with duration '{duration}'")
+            else:
+                # The duration+coin combination is already accounted for
+                logger.warning(f"Coin '{coin}' already in thread with duration '{duration}'")
 
 
 
@@ -211,37 +208,31 @@ class IDManager:
             logger.warning(f"Duration '{duration}' not recognized for coin '{coin}' and could not be removed")
             return
 
-        if duration not in self.focusdict:
-            logger.info(f"Coin '{coin}' not in thread with duration '{duration}' and could not be removed")
-            return
-        
-        elif coin not in self.focusdict[duration]['coins']:
-            logger.info(f"Coin '{coin}' not in thread with duration '{duration}' and could not be removed")
-            return 
-        
-        else:
-            # remove coin from coins list
-            self.focusdict[duration]['coins'].remove(coin)
-
-        # remove empty threads
-        #if len(self.focusdict[duration]['coins']) == 0:
-            #self.focusdict[duration]['stop_event'].set()
-            #del self.focusdict[duration]    # let the end of the worker handle this so 2 arent active at once
-
+        with threading.Lock():
+            if duration not in self.focusdict:
+                logger.info(f"Coin '{coin}' not in thread with duration '{duration}' and could not be removed")
+                return
+            
+            elif coin not in self.focusdict[duration]['coins']:
+                logger.info(f"Coin '{coin}' not in thread with duration '{duration}' and could not be removed")
+                return 
+            
+            else:
+                # remove coin from coins list
+                self.focusdict[duration]['coins'].remove(coin)
 
 
     def _worker(self,duration):
         startup = True
         shutdown = False
         while True:
-             # alter to ensure atomicity upon adding/removing focuses
-
-            # copy focusdict and anything else needed to access from class
-            coinlist = self.focusdict[duration]['coins'][:]
-            # terminate loop if coin list is empty
-            if len(coinlist) == 0:
-                del self.focusdict[duration]
-                shutdown = True
+            with threading.Lock():
+                # copy focusdict and anything else needed to access from class
+                coinlist = self.focusdict[duration]['coins'][:]
+                # terminate loop if coin list is empty
+                if len(coinlist) == 0:
+                    del self.focusdict[duration] # remove now so new subscriptions arent added to threads that are shutting down
+                    shutdown = True
 
             # gather all coin IDs for duration
             current_ids = []
