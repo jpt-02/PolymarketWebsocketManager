@@ -180,7 +180,7 @@ class IDManager:
         with threading.Lock():
             if duration not in self.focusdict:
                 # There is not currently a thread timing the requested duration
-                self.focusdict[duration] = {'coins':[coin]}
+                self.focusdict[duration] = {'coins':[coin],'queued_removals':[]}
                 new_thread = threading.Thread(target=self._worker, args=[duration], daemon=True)
                 new_thread.start()
                 self.focusdict[duration]['worker'] = new_thread
@@ -220,6 +220,9 @@ class IDManager:
             else:
                 # remove coin from coins list
                 self.focusdict[duration]['coins'].remove(coin)
+                # add coin to queued removals so it can be unsubscribed from
+                self.focusdict[duration]['queued_removals'].append(coin)
+                # add log for this
 
 
     def _worker(self,duration):
@@ -229,9 +232,11 @@ class IDManager:
             with threading.Lock():
                 # copy focusdict and anything else needed to access from class
                 coinlist = self.focusdict[duration]['coins'][:]
+                removals = self.focusdict[duration]['queued_removals'][:]
                 # terminate loop if coin list is empty
                 if len(coinlist) == 0:
                     del self.focusdict[duration] # remove now so new subscriptions arent added to threads that are shutting down
+                    logger.info(f'{duration} Thread: no coins in focus list, shutting down after remaining loop completes')
                     shutdown = True
 
             # gather all coin IDs for duration
@@ -252,22 +257,28 @@ class IDManager:
                 time.sleep(market_end-60-now) # wait until time is 4:00 or -1:00
             else:
                 # if past halfway and subtime, wait until next loop and retry
-                logger.info(f'{duration} Thread: Waiting until next loop')
+                logger.info(f'{duration} Thread: waiting until next loop')
                 time.sleep(duration_s/2)
                 continue
 
             # sub to 'next' markets     -1:00
             if not shutdown: # change to condition to accomodate end of thread
-                logger.info(f'{duration} Thread: subscribing to market start at {time.ctime(next_ids[0].starttime)} at {time.ctime()}')
+                for id in next_ids:
+                    logger.info(f"{duration} Thread: subscribing to '{id.coin}' market start at {time.ctime(id.starttime)}")
             time.sleep(60)
             # markets officially start/end - do nothing       0:00
             time.sleep(60)
             # unsub from 'now' markets if not startup         1:00
             if not startup:
-                logger.info(f'{duration} Thread: unsubscribing to market stop at {time.ctime(current_ids[0].stoptime)} at {time.ctime()}')
-                startup = False
+                for id in current_ids:
+                    logger.info(f"{duration} Thread: unsubscribing to '{id.coin}' market stop at {time.ctime(id.stoptime)}")
+            
+            startup = False # mark startup as false at end of first loop
+            
             # loop ends at around 1:00
+
             if shutdown:
+                logger.info(f'{duration} Thread: Shutting Down')
                 return
 
 
@@ -282,16 +293,23 @@ if __name__ == '__main__':
     testmanager = IDManager('test')
     # testmanager.add_focus('btc','15min')
     # testmanager.add_focus('btc','15min')
-    # testmanager.add_focus('btc','5min')
+    testmanager.add_focus('btc','5min')
     # testmanager.add_focus('eth','5min')
-    testmanager.add_focus('sol','1hour')
-    testmanager.add_focus('xrp','4hour')
-    testmanager.add_focus('idk','idk')
-    testmanager.add_focus('btc','idk')
+    # testmanager.add_focus('sol','1hour')
+    # testmanager.add_focus('xrp','4hour')
+    # testmanager.add_focus('idk','idk')
+    # testmanager.add_focus('btc','idk')
     #print(testmanager.focusdict)
+
+    # try:
+    #     while True:
+    #         time.sleep(10)
+    # except KeyboardInterrupt:
+    #     pass
 
     try:
         while True:
-            time.sleep(10)
+            time.sleep(200)
+            #testmanager.remove_focus('btc','5min')
     except KeyboardInterrupt:
         pass
