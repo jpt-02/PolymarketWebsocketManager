@@ -166,6 +166,7 @@ class IDManager:
     def __init__(self,websocket):
         self.websocket = websocket
         self.focusdict = {} # duration: {coins:list, worker:thread}
+        self.lock = threading.Lock()
 
     def add_focus(self,coin,duration):
         # tells manager which assets to focus on
@@ -177,7 +178,7 @@ class IDManager:
             logger.warning(f"Duration '{duration}' not recognized for coin '{coin}' and could not be added")
             return
 
-        with threading.Lock():
+        with self.lock:
             if duration not in self.focusdict:
                 # There is not currently a thread timing the requested duration
                 self.focusdict[duration] = {'coins':[coin],'queued_removals':[]}
@@ -191,6 +192,11 @@ class IDManager:
                 # There is a thread timing the requested duration, but it does not have the requested coin
                 self.focusdict[duration]['coins'].append(coin)
                 logger.info(f"Added coin '{coin}' to thread with duration '{duration}'")
+
+            elif (coin in self.focusdict[duration]['coins']) and (coin in self.focusdict[duration]['queued_removals']):
+                # The duration+coind combination is already accounted for but it is also queued as a removal
+                self.focusdict[duration]['queued_removals'].remove(coin)
+                logger.info(f"Removal request for '{coin}' cancelled for thread '{duration}'")
 
             else:
                 # The duration+coin combination is already accounted for
@@ -208,7 +214,7 @@ class IDManager:
             logger.warning(f"Duration '{duration}' not recognized for coin '{coin}' and could not be removed")
             return
 
-        with threading.Lock():
+        with self.lock:
             if duration not in self.focusdict:
                 logger.info(f"Coin '{coin}' not in thread with duration '{duration}' and could not be removed")
                 return
@@ -218,37 +224,36 @@ class IDManager:
                 return 
             
             else:
-                # remove coin from coins list
-                self.focusdict[duration]['coins'].remove(coin)
                 # add coin to queued removals so it can be unsubscribed from
                 self.focusdict[duration]['queued_removals'].append(coin)
                 # add log for this
-
+                logger.info(f"Coin '{coin}' queued for removal in thread with duration '{duration}'")
 
     def _worker(self,duration):
+        
         startup = True
-        shutdown = False
+        time.sleep(1) # wait 1 second for focusdict to populate on startup
+
         while True:
-            with threading.Lock():
-                # copy focusdict and anything else needed to access from class
+            with self.lock:
+                # make a copy of coinlist from the focusdict for this duration
                 coinlist = self.focusdict[duration]['coins'][:]
-                removals = self.focusdict[duration]['queued_removals'][:]
                 # terminate loop if coin list is empty
                 if len(coinlist) == 0:
                     del self.focusdict[duration] # remove now so new subscriptions arent added to threads that are shutting down
-                    logger.info(f'{duration} Thread: no coins in focus list, shutting down after remaining loop completes')
-                    shutdown = True
+                    logger.info(f'{duration} Thread: Shutting Down')
+                    return
 
             # gather all coin IDs for duration
-            current_ids = []
-            next_ids = []
+            unsub_ids = {}
+            sub_ids = {}
             for coin in coinlist:
-                current_ids.append(MarketIdentifier(coin,duration,'now'))
-                next_ids.append(MarketIdentifier(coin,duration,'next'))
-
-            # work out timing
-            market_end = current_ids[0].stoptime
-            duration_s = current_ids[0].durationtime
+                unsub_ids[coin] = MarketIdentifier(coin,duration,'now')
+                sub_ids[coin] = MarketIdentifier(coin,duration,'next')
+            
+            # work out timing with random coin from coinlist
+            market_end = unsub_ids[coinlist[0]].stoptime
+            duration_s = unsub_ids[coinlist[0]].durationtime
             now = time.time()
 
             if now < market_end-60:
@@ -260,26 +265,28 @@ class IDManager:
                 logger.info(f'{duration} Thread: waiting until next loop')
                 time.sleep(duration_s/2)
                 continue
+            
+            with self.lock:
+                removals = self.focusdict[duration]['queued_removals'][:]
+                for coin in removals:
+                    sub_ids.pop(coin) # remove corresponding entries in sub_ids
+                    self.focusdict[duration]['coins'].remove(coin) # also remove corresponding entries from next loop's coinlist
+                    self.focusdict[duration]['queued_removals'].remove(coin)
 
             # sub to 'next' markets     -1:00
-            if not shutdown: # change to condition to accomodate end of thread
-                for id in next_ids:
-                    logger.info(f"{duration} Thread: subscribing to '{id.coin}' market start at {time.ctime(id.starttime)}")
+            for id in sub_ids.values():
+                logger.info(f"{duration} Thread: subscribing to '{id.coin}' market start at {time.ctime(id.starttime)}")
             time.sleep(60)
             # markets officially start/end - do nothing       0:00
             time.sleep(60)
-            # unsub from 'now' markets if not startup         1:00
+            # unsub from 'now' markets       1:00
             if not startup:
-                for id in current_ids:
+                for id in unsub_ids.values(): # ubsub from stale markets
                     logger.info(f"{duration} Thread: unsubscribing to '{id.coin}' market stop at {time.ctime(id.stoptime)}")
             
             startup = False # mark startup as false at end of first loop
             
             # loop ends at around 1:00
-
-            if shutdown:
-                logger.info(f'{duration} Thread: Shutting Down')
-                return
 
 
                
@@ -294,7 +301,7 @@ if __name__ == '__main__':
     # testmanager.add_focus('btc','15min')
     # testmanager.add_focus('btc','15min')
     testmanager.add_focus('btc','5min')
-    # testmanager.add_focus('eth','5min')
+    #testmanager.add_focus('eth','5min')
     # testmanager.add_focus('sol','1hour')
     # testmanager.add_focus('xrp','4hour')
     # testmanager.add_focus('idk','idk')
@@ -309,7 +316,7 @@ if __name__ == '__main__':
 
     try:
         while True:
-            time.sleep(200)
-            #testmanager.remove_focus('btc','5min')
+            time.sleep(620)
+            testmanager.remove_focus('btc','5min')
     except KeyboardInterrupt:
         pass
