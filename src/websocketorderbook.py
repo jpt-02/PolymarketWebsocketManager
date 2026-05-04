@@ -92,7 +92,7 @@ if __name__ == "__main__":
     api_passphrase = os.getenv('POLY_API_PASSPHRASE')
 
     slug = "btc-updown-15m-1771790400"
-    from GetIDs import market_from_slug
+    from subtimer import market_from_slug
     question, conditionID, upID, downID = market_from_slug(slug)
 
     asset_ids = [upID]

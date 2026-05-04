@@ -162,7 +162,7 @@ class MarketIdentifier:
 #     print(TestIdentifier2.slug)
 
 
-class IDManager:
+class SubTimer:
     def __init__(self,websocket):
         self.websocket = websocket
         self.focusdict = {} # duration: {coins:list, worker:thread}

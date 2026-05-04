@@ -2,7 +2,7 @@ from py_clob_client.client import ClobClient
 from dotenv import load_dotenv, set_key, find_dotenv
 import os
 
-def derivekeys():
+def derive_keys():
     # Set up environment access
     env_path = find_dotenv()
     load_dotenv(env_path)
@@ -30,4 +30,4 @@ def derivekeys():
     set_key(env_path, "POLY_API_PASSPHRASE", creds.api_passphrase)
 
 if __name__ == "__main__":
-    derivekeys()
+    derive_keys()

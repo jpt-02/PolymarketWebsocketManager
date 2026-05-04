@@ -1,7 +1,7 @@
-from OpenSocket import WebSocketOrderBook
+from websocketorderbook import WebSocketOrderBook
 from dotenv import load_dotenv, find_dotenv
 import os
-from bookslots import OrderBook
+from orderbook import OrderBook
 import json
 import queue
 import threading
