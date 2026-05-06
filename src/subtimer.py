@@ -297,7 +297,7 @@ if __name__ == '__main__':
 
     logger.info('Logging started locally')
 
-    testmanager = IDManager('test')
+    testmanager = SubTimer('test')
     # testmanager.add_focus('btc','15min')
     # testmanager.add_focus('btc','15min')
     testmanager.add_focus('btc','5min')
